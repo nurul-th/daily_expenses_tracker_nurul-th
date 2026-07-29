@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Expense Tracker</title>
+  <!-- Chart.js Library for Dashboard -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- External CSS File -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- 0A. LOGIN CARD -->
+  <div class="card" id="card-login">
+    <h2>Login</h2>
+    <form onsubmit="handleLogin(event)">
+      <input type="text" id="login-username" placeholder="Username" aria-label="Username" title="Username" required>
+      <input type="password" id="login-password" placeholder="Password" aria-label="Password" title="Password" required>
+      
+      <div class="remember-me-container">
+        <input type="checkbox" id="login-remember" aria-label="Remember Me" title="Remember Me">
+        <label for="login-remember">Remember Me</label>
+      </div>
+
+      <button type="submit">Login</button>
+    </form>
+
+    <div class="auth-links">
+      <button type="button" class="auth-link-btn" onclick="showAuthView('register')">Create Account</button>
+      <button type="button" class="auth-link-btn" onclick="showAuthView('forgot')">Forgot Password?</button>
+      <button type="button" class="auth-link-btn" onclick="showAuthView('support')">Need Support?</button>
+    </div>
+  </div>
+
+  <!-- 0B. REGISTER CARD -->
+  <div class="card hidden" id="card-register">
+    <h2>Create New Account</h2>
+    <form onsubmit="handleRegister(event)">
+      <input type="text" id="reg-username" placeholder="Choose Username" aria-label="Choose Username" title="Choose Username" required>
+      <input type="password" id="reg-password" placeholder="Choose Password" aria-label="Choose Password" title="Choose Password" required>
+      <input type="password" id="reg-confirm" placeholder="Confirm Password" aria-label="Confirm Password" title="Confirm Password" required>
+      <input type="text" maxlength="4" id="reg-pin" placeholder="Set 4-Digit Recovery PIN" aria-label="Set 4-Digit Recovery PIN" title="Set 4-Digit Recovery PIN" pattern="\d{4}" required>
+
+      <button type="submit">Register Account</button>
+      <button type="button" class="btn-secondary" onclick="showAuthView('login')">Back to Login</button>
+    </form>
+  </div>
+
+  <!-- 0C. FORGOT PASSWORD CARD -->
+  <div class="card hidden" id="card-forgot">
+    <h2>Reset Password</h2>
+    <form onsubmit="handleForgotPassword(event)">
+      <input type="text" id="forgot-username" placeholder="Your Username" aria-label="Your Username" title="Your Username" required>
+      <input type="password" maxlength="4" id="forgot-pin" placeholder="Enter Your 4-Digit Recovery PIN" aria-label="Enter Your 4-Digit Recovery PIN" title="Enter Your 4-Digit Recovery PIN" pattern="\d{4}" required>
+      <input type="password" id="forgot-new-password" placeholder="Enter New Password" aria-label="Enter New Password" title="Enter New Password" required>
+
+      <button type="submit">Update Password</button>
+      <button type="button" class="btn-secondary" onclick="showAuthView('login')">Back to Login</button>
+    </form>
+  </div>
+
+  <!-- 0D. SUPPORT CARD -->
+  <div class="card hidden" id="card-support">
+    <h2>Technical Support</h2>
+    <div class="disclaimer-box mb-12">
+      <div class="disclaimer-title">How Data Works on This App</div>
+      This application stores all your financial data locally on your device storage for 100% privacy and offline access.
+      <br><br>
+      • <strong>Forgot Password?</strong> Use the "Forgot Password" tab with your 4-digit Recovery PIN.<br>
+      • <strong>Lost Data or Switched Phone?</strong> Restore your data using your saved <strong>.json backup file</strong>.
+    </div>
+
+    <div class="label support-label">For bug reports or inquiries, contact developer:</div>
+    <a href="mailto:support@newruledesign.com" class="support-email">support@newruledesign.com</a>
+
+    <button type="button" class="btn-secondary mt-12" onclick="showAuthView('login')">Back to Login</button>
+  </div>
+
+
+  <!-- MAIN APP CONTAINER (Hidden until authenticated) -->
+  <div id="main-app" class="app-container hidden">
+
+    <!-- Top Header & Logout Button -->
+    <div class="card app-header">
+      <h1>Daily Expense Tracker</h1>
+      <button type="button" class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+    
+    <!-- 1. Financial Overview (Indexed by Selected Date) -->
+    <div class="card">
+      <h2>Financial Overview</h2>
+      
+      <div class="form-group mb-12">
+        <div class="label">Select View Date:</div>
+        <input type="date" id="global-view-date" onchange="handleGlobalDateChange()" aria-label="Select View Date" title="Select View Date">
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-box">
+          <div class="label">Brought Forward</div>
+          <div class="value" id="disp-bf">RM 0.00</div>
+        </div>
+        <div class="summary-box">
+          <div class="label">Income On This Date</div>
+          <div class="value text-green" id="disp-today-in">RM 0.00</div>
+        </div>
+        <div class="summary-box full">
+          <div class="label">Closing Balance On This Date</div>
+          <div class="value" id="disp-balance">RM 0.00</div>
+        </div>
+      </div>
+
+      <button type="button" class="btn-share" onclick="shareDailySummary()">Share Daily Summary</button>
+    </div>
+
+    <!-- 2. Transaction Form -->
+    <div class="card">
+      <div class="tab-group">
+        <button type="button" id="btn-tab-in" class="tab-btn active" onclick="setTxType('in')">Money In</button>
+        <button type="button" id="btn-tab-out" class="tab-btn" onclick="setTxType('out')">Money Out</button>
+      </div>
+
+      <!-- Money In Form -->
+      <form id="tx-form-in" onsubmit="addMoneyInTransaction(event)">
+        <input type="date" id="in-date" aria-label="Transaction Date" title="Transaction Date" required>
+        <select id="in-category" aria-label="Income Type" title="Income Type">
+          <option value="Today Income">Today's Income</option>
+          <option value="Existing Balance">Initial Existing Balance</option>
+        </select>
+        <input type="number" step="0.01" id="in-amount" placeholder="Amount (RM)" aria-label="Amount in RM" title="Amount in RM" required>
+        <input type="text" id="in-desc" placeholder="Description / Source" aria-label="Description or Source" title="Description or Source" required>
+        <select id="in-platform" aria-label="Payment Platform" title="Payment Platform">
+          <option value="DuitNow/QR">DuitNow / QR</option>
+          <option value="Online Banking">Online Banking</option>
+          <option value="Cash">Cash</option>
+          <option value="Credit/Debit Card">Credit / Debit Card</option>
+        </select>
+        <button type="submit">Save Money In</button>
+      </form>
+
+      <!-- Money Out Form (Multi-Item List Style) -->
+      <form id="tx-form-out" class="hidden" onsubmit="addMoneyOutBatch(event)">
+        <input type="date" id="out-date" aria-label="Transaction Date" title="Transaction Date" required>
+        
+        <div id="out-items-container" class="form-group">
+          <!-- Multi-items will be added here dynamically -->
+        </div>
+
+        <button type="button" class="btn-add-item" onclick="addExpenseListItem()">+ Add Item to List</button>
+        <button type="submit">Submit All Expenses</button>
+      </form>
+    </div>
+
+    <!-- 3. Carousel Dashboard (Indexed by Selected Date) -->
+    <div class="card">
+      <h2>Financial Analytics</h2>
+      
+      <div class="carousel-container mt-12">
+        <div class="carousel-track" id="carousel-track">
+          <!-- Slide 1: Expense Breakdown -->
+          <div class="carousel-slide">
+            <h3 class="carousel-title">Expense Breakdown (This Date)</h3>
+            <canvas id="categoryChart"></canvas>
+          </div>
+          <!-- Slide 2: Comparison -->
+          <div class="carousel-slide">
+            <h3 class="carousel-title">Money In vs Money Out (This Date)</h3>
+            <canvas id="compareChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Carousel Controls -->
+      <div class="carousel-nav">
+        <button type="button" class="btn-nav-arrow" onclick="switchSlide(0)">&larr; Category</button>
+        <div class="nav-dot-container">
+          <div class="dot active" id="dot-0" onclick="switchSlide(0)"></div>
+          <div class="dot" id="dot-1" onclick="switchSlide(1)"></div>
+        </div>
+        <button type="button" class="btn-nav-arrow" onclick="switchSlide(1)">Comparison &rarr;</button>
+      </div>
+    </div>
+
+    <!-- 4. Transactions List for Selected Date -->
+    <div class="card">
+      <h3>Transactions On Selected Date</h3>
+      <ul class="history-list" id="date-history-list"></ul>
+    </div>
+
+    <!-- 5. Backup & Restore Section -->
+    <div class="card">
+      <h3>Backup & Restore Data</h3>
+      
+      <!-- Backup Reminder Box -->
+      <div class="backup-reminder-box">
+        <div class="backup-reminder-title">💡 Important Backup Reminder:</div>
+        Your financial records are stored only on this device. Please <strong>export a backup file (.json)</strong> at the end of every week or month and save it to Google Drive or WhatsApp to prevent data loss!
+      </div>
+
+      <div class="backup-grid">
+        <button type="button" onclick="exportBackupData()">Export Backup (.json)</button>
+        <button type="button" class="btn-secondary" onclick="triggerImportFile()">Import Backup</button>
+        <input type="file" id="import-file-input" accept=".json" class="hidden" aria-label="Import Backup File" title="Import Backup File" onchange="importBackupData(event)">
+      </div>
+    </div>
+
+    <!-- 6. All Transactions History & Reset -->
+    <div class="card">
+      <h3>All Recorded History</h3>
+      <ul class="history-list" id="history-list"></ul>
+      <button type="button" class="btn-reset-all" onclick="resetAllData()">Reset All Data</button>
+    </div>
+
+    <!-- 7. Legal Disclaimer Box -->
+    <div class="disclaimer-box">
+      <div class="disclaimer-title">Legal Disclaimer & Terms of Use</div>
+      This application stores data locally on your device storage. The developer and Newrule Design Studio shall not be held liable for any loss of financial data, calculation discrepancies, or hardware issues arising from the use of this application. Users are solely responsible for creating regular backups of their data.
+    </div>
+
+    <!-- 8. Footer -->
+    <div class="app-footer">
+      &copy; 2026 Newrule Design Studio. All rights reserved.
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  let transactions = JSON.parse(localStorage.getItem('expenses_data')) || [];
+  let currentTxType = 'in';
+  
+  let categoryChartInstance = null;
+  let compareChartInstance = null;
+
+  let currentBroughtForward = 0;
+  let currentSelectedIn = 0;
+  let currentSelectedOut = 0;
+  let currentClosingBalance = 0;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  document.getElementById('global-view-date').value = todayStr;
+  document.getElementById('in-date').value = todayStr;
+  document.getElementById('out-date').value = todayStr;
+
+  // --- Auth View Switcher ---
+  function showAuthView(view) {
+    document.getElementById('card-login').classList.add('hidden');
+    document.getElementById('card-register').classList.add('hidden');
+    document.getElementById('card-forgot').classList.add('hidden');
+    document.getElementById('card-support').classList.add('hidden');
+
+    if (view === 'login') document.getElementById('card-login').classList.remove('hidden');
+    else if (view === 'register') document.getElementById('card-register').classList.remove('hidden');
+    else if (view === 'forgot') document.getElementById('card-forgot').classList.remove('hidden');
+    else if (view === 'support') document.getElementById('card-support').classList.remove('hidden');
+  }
+
+  function checkAuthOnLoad() {
+    const userCredentials = JSON.parse(localStorage.getItem('user_credentials'));
+    const isRemembered = localStorage.getItem('is_remembered') === 'true';
+
+    if (!userCredentials) {
+      showAuthView('register');
+    } else if (isRemembered) {
+      showAuthView('none');
+      document.getElementById('main-app').classList.remove('hidden');
+      refreshUI();
+    } else {
+      showAuthView('login');
+    }
+  }
+
+  function handleRegister(e) {
+    e.preventDefault();
+    const username = document.getElementById('reg-username').value.trim();
+    const pass = document.getElementById('reg-password').value.trim();
+    const confirm = document.getElementById('reg-confirm').value.trim();
+    const pin = document.getElementById('reg-pin').value.trim();
+
+    if (pass !== confirm) {
+      alert("Passwords do not match!");
+      return;
+    }
+
+    const credentials = { username: username, password: pass, pin: pin };
+    localStorage.setItem('user_credentials', JSON.stringify(credentials));
+    alert("Account created successfully! Please login.");
+    showAuthView('login');
+  }
+
+  function handleLogin(e) {
+    e.preventDefault();
+    const user = document.getElementById('login-username').value.trim();
+    const pass = document.getElementById('login-password').value.trim();
+    const remember = document.getElementById('login-remember').checked;
+
+    const stored = JSON.parse(localStorage.getItem('user_credentials'));
+
+    if (stored && user === stored.username && pass === stored.password) {
+      localStorage.setItem('is_remembered', remember ? 'true' : 'false');
+      showAuthView('none');
+      document.getElementById('main-app').classList.remove('hidden');
+      refreshUI();
+    } else {
+      alert("Invalid username or password.");
+    }
+  }
+
+  function handleForgotPassword(e) {
+    e.preventDefault();
+    const user = document.getElementById('forgot-username').value.trim();
+    const pin = document.getElementById('forgot-pin').value.trim();
+    const newPass = document.getElementById('forgot-new-password').value.trim();
+
+    const stored = JSON.parse(localStorage.getItem('user_credentials'));
+
+    if (stored && user === stored.username && pin === stored.pin) {
+      stored.password = newPass;
+      localStorage.setItem('user_credentials', JSON.stringify(stored));
+      alert("Password updated successfully! Please login with your new password.");
+      showAuthView('login');
+    } else {
+      alert("Invalid username or Recovery PIN.");
+    }
+  }
+
+  function logout() {
+    localStorage.setItem('is_remembered', 'false');
+    document.getElementById('login-password').value = '';
+    document.getElementById('main-app').classList.add('hidden');
+    showAuthView('login');
+  }
+
+  // --- Export & Import Backup Logic ---
+  function exportBackupData() {
+    const dataStr = JSON.stringify(transactions, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `expense_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function triggerImportFile() {
+    document.getElementById('import-file-input').click();
+  }
+
+  function importBackupData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        if (Array.isArray(importedData)) {
+          if (confirm("Importing backup will merge with your current records. Continue?")) {
+            transactions = importedData;
+            saveAndRefresh();
+            alert("Backup data restored successfully!");
+          }
+        } else {
+          alert("Invalid backup file format.");
+        }
+      } catch (err) {
+        alert("Failed to parse backup file.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // --- Share Daily Summary ---
+  function shareDailySummary() {
+    const selectedDate = document.getElementById('global-view-date').value;
+    const filtered = transactions.filter(tx => tx.date.split('T')[0] === selectedDate);
+
+    let text = `📊 *DAILY EXPENSE SUMMARY*\n📅 *Date:* ${selectedDate}\n\n`;
+    text += `💰 *Brought Forward:* RM ${currentBroughtForward.toFixed(2)}\n`;
+    text += `💵 *Income Today:* RM ${currentSelectedIn.toFixed(2)}\n`;
+    text += `💸 *Expenses Today:* RM ${currentSelectedOut.toFixed(2)}\n`;
+    text += `⚖️ *Closing Balance:* RM ${currentClosingBalance.toFixed(2)}\n\n`;
+
+    if (filtered.length > 0) {
+      text += `📝 *Transaction Details:*\n`;
+      filtered.forEach((tx, i) => {
+        const sign = tx.type === 'out' ? '-' : '+';
+        text += `${i + 1}. ${tx.desc} (${tx.category}) - ${sign}RM ${tx.amount.toFixed(2)} [${tx.platform}]\n`;
+      });
+    } else {
+      text += `_No transactions recorded on this date._`;
+    }
+
+    if (navigator.share) {
+      navigator.share({
+        title: `Expense Summary - ${selectedDate}`,
+        text: text
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text);
+      alert("Summary text copied to clipboard! You can now paste and share it on WhatsApp.");
+    }
+  }
+
+  function handleGlobalDateChange() {
+    const selectedDate = document.getElementById('global-view-date').value;
+    document.getElementById('in-date').value = selectedDate;
+    document.getElementById('out-date').value = selectedDate;
+    refreshUI();
+  }
+
+  function setTxType(type) {
+    currentTxType = type;
+    document.getElementById('btn-tab-in').classList.toggle('active', type === 'in');
+    document.getElementById('btn-tab-out').classList.toggle('active', type === 'out');
+    
+    document.getElementById('tx-form-in').classList.toggle('hidden', type !== 'in');
+    document.getElementById('tx-form-out').classList.toggle('hidden', type !== 'out');
+  }
+
+  // --- Multi-Item Money Out Logic ---
+  let itemCounter = 0;
+  function addExpenseListItem() {
+    itemCounter++;
+    const container = document.getElementById('out-items-container');
+    const itemCard = document.createElement('div');
+    itemCard.className = 'out-item-card';
+    itemCard.id = `out-item-${itemCounter}`;
+
+    itemCard.innerHTML = `
+      <input type="number" step="0.01" class="out-item-amount" placeholder="Amount (RM)" aria-label="Amount in RM" title="Amount in RM" required>
+      <input type="text" class="out-item-desc" placeholder="Pay For What / Description" aria-label="Pay For What or Description" title="Pay For What or Description" required>
+      <select class="out-item-platform" aria-label="Payment Platform" title="Payment Platform">
+        <option value="DuitNow/QR">DuitNow / QR</option>
+        <option value="Online Banking">Online Banking</option>
+        <option value="Cash">Cash</option>
+        <option value="Credit/Debit Card">Credit / Debit Card</option>
+      </select>
+      <select class="out-item-category" aria-label="Expense Category" title="Expense Category">
+        <option value="Food & Beverages">Food & Beverages</option>
+        <option value="Transportation">Transportation / Fuel</option>
+        <option value="Groceries">Groceries</option>
+        <option value="Bills & Utilities">Bills & Utilities</option>
+        <option value="Shopping">Shopping</option>
+        <option value="Entertainment">Entertainment</option>
+        <option value="Others">Others</option>
+      </select>
+      ${container.children.length > 0 ? `<button type="button" class="btn-remove-item" onclick="removeExpenseListItem('${itemCard.id}')">Remove Item</button>` : ''}
+    `;
+
+    container.appendChild(itemCard);
+  }
+
+  function removeExpenseListItem(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  addExpenseListItem();
+
+  // --- Transactions Logic ---
+  function addMoneyInTransaction(e) {
+    e.preventDefault();
+    const dateInput = document.getElementById('in-date').value;
+    const category = document.getElementById('in-category').value;
+    const amount = parseFloat(document.getElementById('in-amount').value);
+    const desc = document.getElementById('in-desc').value;
+    const platform = document.getElementById('in-platform').value;
+
+    const newTx = {
+      id: Date.now(),
+      type: 'in',
+      amount: amount,
+      desc: desc,
+      platform: platform,
+      category: category,
+      date: new Date(dateInput).toISOString()
+    };
+
+    transactions.push(newTx);
+    saveAndRefresh();
+    document.getElementById('tx-form-in').reset();
+    document.getElementById('in-date').value = dateInput;
+  }
+
+  function addMoneyOutBatch(e) {
+    e.preventDefault();
+    const dateInput = document.getElementById('out-date').value;
+    const itemCards = document.querySelectorAll('.out-item-card');
+
+    itemCards.forEach((card, index) => {
+      const amount = parseFloat(card.querySelector('.out-item-amount').value);
+      const desc = card.querySelector('.out-item-desc').value;
+      const platform = card.querySelector('.out-item-platform').value;
+      const category = card.querySelector('.out-item-category').value;
+
+      if (amount && desc) {
+        transactions.push({
+          id: Date.now() + index,
+          type: 'out',
+          amount: amount,
+          desc: desc,
+          platform: platform,
+          category: category,
+          date: new Date(dateInput).toISOString()
+        });
+      }
+    });
+
+    saveAndRefresh();
+    document.getElementById('tx-form-out').reset();
+    document.getElementById('out-items-container').innerHTML = '';
+    addExpenseListItem();
+    document.getElementById('out-date').value = dateInput;
+  }
+
+  function deleteSingleEntry(id) {
+    if (confirm("Are you sure you want to delete this transaction?")) {
+      transactions = transactions.filter(tx => tx.id !== id);
+      saveAndRefresh();
+    }
+  }
+
+  function resetAllData() {
+    if (confirm("Do you want to reset all data? This action cannot be undone.")) {
+      transactions = [];
+      localStorage.removeItem('expenses_data');
+      refreshUI();
+    }
+  }
+
+  function saveAndRefresh() {
+    localStorage.setItem('expenses_data', JSON.stringify(transactions));
+    refreshUI();
+  }
+
+  // --- Strict Date-Indexed Calculation ---
+  function calculateTotalsForSelectedDate(selectedDateStr) {
+    currentBroughtForward = 0;
+    currentSelectedIn = 0;
+    currentSelectedOut = 0;
+
+    transactions.forEach(tx => {
+      const txDateStr = tx.date.split('T')[0];
+
+      if (txDateStr < selectedDateStr) {
+        if (tx.type === 'in') currentBroughtForward += tx.amount;
+        else currentBroughtForward -= tx.amount;
+      } else if (txDateStr === selectedDateStr) {
+        if (tx.type === 'in') {
+          if (tx.category === 'Existing Balance') {
+            currentBroughtForward += tx.amount;
+          } else {
+            currentSelectedIn += tx.amount;
+          }
+        } else {
+          currentSelectedOut += tx.amount;
+        }
+      }
+    });
+
+    currentClosingBalance = currentBroughtForward + currentSelectedIn - currentSelectedOut;
+
+    document.getElementById('disp-bf').innerText = `RM ${currentBroughtForward.toFixed(2)}`;
+    document.getElementById('disp-today-in').innerText = `RM ${currentSelectedIn.toFixed(2)}`;
+    document.getElementById('disp-balance').innerText = `RM ${currentClosingBalance.toFixed(2)}`;
+  }
+
+  function renderDateHistory(selectedDateStr) {
+    const list = document.getElementById('date-history-list');
+    list.innerHTML = '';
+
+    const filtered = transactions.filter(tx => tx.date.split('T')[0] === selectedDateStr);
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<li class="history-item" style="justify-content:center; color:#6b7280;">No transactions on this date</li>';
+      return;
+    }
+
+    filtered.forEach(tx => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      const isOut = tx.type === 'out';
+      const colorClass = isOut ? 'text-red' : 'text-green';
+      const sign = isOut ? '-' : '+';
+      
+      li.innerHTML = `
+        <div>
+          <strong>${tx.desc}</strong> <small>(${tx.category})</small><br>
+          <small style="color: #6b7280;">${tx.platform}</small>
+        </div>
+        <div class="item-right">
+          <div class="${colorClass}" style="font-weight: bold;">
+            ${sign}RM ${tx.amount.toFixed(2)}
+          </div>
+          <button type="button" class="btn-delete-single" onclick="deleteSingleEntry(${tx.id})">Delete</button>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  function renderAllHistory() {
+    const list = document.getElementById('history-list');
+    list.innerHTML = '';
+
+    if (transactions.length === 0) {
+      list.innerHTML = '<li class="history-item" style="justify-content:center; color:#6b7280;">No transactions recorded</li>';
+      return;
+    }
+
+    [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(tx => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      const isOut = tx.type === 'out';
+      const colorClass = isOut ? 'text-red' : 'text-green';
+      const sign = isOut ? '-' : '+';
+      
+      li.innerHTML = `
+        <div>
+          <strong>${tx.desc}</strong> <small>(${tx.category})</small><br>
+          <small style="color: #6b7280;">${new Date(tx.date).toLocaleDateString()} | ${tx.platform}</small>
+        </div>
+        <div class="item-right">
+          <div class="${colorClass}" style="font-weight: bold;">
+            ${sign}RM ${tx.amount.toFixed(2)}
+          </div>
+          <button type="button" class="btn-delete-single" onclick="deleteSingleEntry(${tx.id})">Delete</button>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  // --- Carousel & Dashboard ---
+  function switchSlide(index) {
+    document.getElementById('carousel-track').style.transform = `translateX(-${index * 50}%)`;
+    document.getElementById('dot-0').classList.toggle('active', index === 0);
+    document.getElementById('dot-1').classList.toggle('active', index === 1);
+  }
+
+  function updateDashboard(selectedDateStr) {
+    const filtered = transactions.filter(tx => tx.date.split('T')[0] === selectedDateStr);
+
+    const categoryTotals = {};
+    let periodIncome = 0;
+    let periodExpense = 0;
+
+    filtered.forEach(tx => {
+      if (tx.type === 'out') {
+        categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
+        periodExpense += tx.amount;
+      } else {
+        if (tx.category !== 'Existing Balance') {
+          periodIncome += tx.amount;
+        }
+      }
+    });
+
+    const catLabels = Object.keys(categoryTotals);
+    const catValues = Object.values(categoryTotals);
+
+    const sagePalette = ['#52796f', '#84a98c', '#354f52', '#cad2c5', '#2f3e46', '#e76f51', '#2a9d8f'];
+
+    if (categoryChartInstance) categoryChartInstance.destroy();
+    const ctxCat = document.getElementById('categoryChart').getContext('2d');
+    categoryChartInstance = new Chart(ctxCat, {
+      type: 'doughnut',
+      data: {
+        labels: catLabels.length ? catLabels : ['No Expense'],
+        datasets: [{
+          data: catValues.length ? catValues : [1],
+          backgroundColor: catLabels.length ? sagePalette.slice(0, catLabels.length) : ['#cad2c5']
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    if (compareChartInstance) compareChartInstance.destroy();
+    const ctxComp = document.getElementById('compareChart').getContext('2d');
+    compareChartInstance = new Chart(ctxComp, {
+      type: 'bar',
+      data: {
+        labels: ['Money In', 'Money Out'],
+        datasets: [{
+          label: 'RM Total',
+          data: [periodIncome, periodExpense],
+          backgroundColor: ['#2a9d8f', '#e76f51']
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+  }
+
+  function refreshUI() {
+    const selectedDateStr = document.getElementById('global-view-date').value;
+    calculateTotalsForSelectedDate(selectedDateStr);
+    renderDateHistory(selectedDateStr);
+    renderAllHistory();
+    updateDashboard(selectedDateStr);
+  }
+
+  // Initial Load
+  setTxType('in');
+  checkAuthOnLoad();
+</script>
+
+</body>
+</html>
